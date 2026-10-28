@@ -69,7 +69,7 @@ impl ApiClient {
             .bytes()
             .await
             .map_err(|error| map_request_error(&error))?;
-        let envelope: ApiEnvelope<T> = serde_json::from_slice(&bytes).map_err(|_| {
+        let envelope: ApiEnvelope<serde_json::Value> = serde_json::from_slice(&bytes).map_err(|_| {
             if status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS {
                 AppError::network(format!("The service returned HTTP {status}"))
             } else {
@@ -88,6 +88,8 @@ impl ApiClient {
         let data = envelope
             .data
             .ok_or_else(|| AppError::new("response", "The API response did not contain data"))?;
+        let data = serde_json::from_value(data)
+            .map_err(|_| AppError::new("response", "The API response data has an unexpected shape"))?;
         Ok((data, envelope.warnings))
     }
 
