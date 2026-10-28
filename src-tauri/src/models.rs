@@ -353,9 +353,13 @@ impl ServiceProfile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Usage {
+    #[serde(alias = "remaining_paid_pages")]
     pub remaining_paid_pages: i64,
+    #[serde(alias = "remaining_free_pages_today")]
     pub remaining_free_pages_today: i64,
+    #[serde(alias = "remaining_free_pages_this_month")]
     pub remaining_free_pages_this_month: i64,
+    #[serde(alias = "dashboard_url")]
     pub dashboard_url: String,
     #[serde(default)]
     pub warnings: Vec<String>,
@@ -402,7 +406,9 @@ impl AppSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiMetadata {
+    #[serde(alias = "page_num")]
     pub page_num: Option<u32>,
+    #[serde(alias = "file_type")]
     pub file_type: Option<String>,
 }
 
@@ -418,6 +424,7 @@ pub struct ParseOutputs {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ParseResult {
+    #[serde(alias = "file_name")]
     pub file_name: Option<String>,
     pub catalog: Option<Value>,
     pub outputs: ParseOutputs,
@@ -426,28 +433,42 @@ pub struct ParseResult {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ParseData {
+    #[serde(alias = "task_id")]
     pub task_id: Option<String>,
     pub status: Option<String>,
     pub metadata: Option<ApiMetadata>,
     pub result: Option<ParseResult>,
+    #[serde(alias = "file_name")]
     pub file_name: Option<String>,
+    #[serde(alias = "error_code")]
     pub error_code: Option<i32>,
+    #[serde(alias = "error_message")]
     pub error_message: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct OfficeData {
+    #[serde(alias = "task_id")]
     pub task_id: Option<String>,
     pub status: Option<String>,
+    #[serde(alias = "target_type")]
     pub target_type: Option<String>,
+    #[serde(alias = "layout_mode")]
     pub layout_mode: Option<String>,
+    #[serde(alias = "file_name")]
     pub file_name: Option<String>,
+    #[serde(alias = "page_num")]
     pub page_num: Option<u32>,
+    #[serde(alias = "result_file_name")]
     pub result_file_name: Option<String>,
+    #[serde(alias = "error_code")]
     pub error_code: Option<i32>,
+    #[serde(alias = "error_message")]
     pub error_message: Option<String>,
+    #[serde(alias = "download_url")]
     pub download_url: Option<String>,
+    #[serde(alias = "expires_in")]
     pub expires_in: Option<u64>,
 }
 

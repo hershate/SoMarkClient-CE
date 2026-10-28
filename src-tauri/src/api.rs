@@ -134,11 +134,7 @@ impl ApiClient {
                 serde_json::to_string(&task.parse_options.element_formats)
                     .map_err(|_| AppError::new("parameters", "Invalid element formats"))?,
             )
-            .text(
-                "feature_config",
-                serde_json::to_string(&task.parse_options.feature_config)
-                    .map_err(|_| AppError::new("parameters", "Invalid feature config"))?,
-            );
+            .text("feature_config", feature_config_json(task));
         self.add_source(form, &task.source, progress).await
     }
 
@@ -347,4 +343,19 @@ async fn streaming_file_part(path: &Path, progress: Option<ProgressCallback>) ->
         .file_name(name)
         .mime_str("application/octet-stream")
         .map_err(|_| AppError::new("file", "Unable to construct the file upload"))
+}
+
+fn feature_config_json(task: &Task) -> String {
+    let config = &task.parse_options.feature_config;
+    serde_json::json!({
+        "enable_text_cross_page": config.enable_text_cross_page,
+        "enable_table_cross_page": config.enable_table_cross_page,
+        "enable_title_level_recognition": config.enable_title_level_recognition,
+        "enable_inline_image": config.enable_inline_image,
+        "enable_table_image": config.enable_table_image,
+        "enable_image_understanding": config.enable_image_understanding,
+        "enable_image_ocr": config.enable_image_ocr,
+        "keep_header_footer": config.keep_header_footer,
+    })
+    .to_string()
 }

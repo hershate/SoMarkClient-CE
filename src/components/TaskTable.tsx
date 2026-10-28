@@ -97,7 +97,7 @@ export default function TaskTable({ items, history = false }: { items: Task[]; h
                     {(task.status === 'paused' || task.status === 'stopped') && <button type="button" className="icon-button" title={t('tasks.resume')} onClick={() => void action(task, 'resume')}><Play size={16} /></button>}
                     {['uploading', 'waiting', 'downloading'].includes(task.status) && <button type="button" className="icon-button" title={t('tasks.stop')} onClick={() => void action(task, 'stop')}><Square size={15} /></button>}
                     {['failed', 'partialSuccess', 'submissionUnknown'].includes(task.status) && <button type="button" className={`icon-button ${task.status === 'submissionUnknown' ? 'warning' : ''}`} title={task.status === 'submissionUnknown' ? t('tasks.confirmRetry') : t('tasks.retry')} onClick={() => void action(task, 'retry')}><RotateCcw size={16} /></button>}
-                    {!history && !active && <>
+                    {!history && task.status === 'queued' && <>
                       <button type="button" className="icon-button subtle" title="Priority up" onClick={() => void action(task, 'reorder', task.priority + 1)}><ArrowUp size={15} /></button>
                       <button type="button" className="icon-button subtle" title="Priority down" onClick={() => void action(task, 'reorder', task.priority - 1)}><ArrowDown size={15} /></button>
                     </>}

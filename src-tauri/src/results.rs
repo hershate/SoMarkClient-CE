@@ -80,17 +80,17 @@ pub async fn persist_parse(
             Some(url) => {
                 let destination = unique_path(directory.join(format!("{stem}.zip")), false);
                 match api.download(profile, url, &destination, progress).await {
-                    Ok(path) => {
-                        if let Err(error) = extract_zip_resources(&path, &directory.join("assets"))
-                        {
-                            failure = Some(error);
-                        }
-                        outputs.push(output("zip", path));
-                    }
+                    Ok(path) => outputs.push(output("zip", path)),
                     Err(error) => failure = Some(error),
                 }
             }
             None => failure = Some(AppError::new("result", "ZIP output is missing")),
+        }
+    }
+
+    if let Some(zip) = outputs.iter().find(|value| value.format == "zip") {
+        if let Err(error) = extract_zip_resources(Path::new(&zip.path), &directory.join("assets")) {
+            failure = Some(error);
         }
     }
 

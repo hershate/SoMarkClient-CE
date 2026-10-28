@@ -300,9 +300,6 @@ async fn submit_task(
             };
             match response {
                 Ok((data, warnings)) => {
-                    if interrupted(&store, &task.id) {
-                        return Ok(());
-                    }
                     task.warnings = warnings;
                     task.progress = 1.0;
                     task.remote_id = data.task_id.clone().or(task.remote_id);
@@ -320,11 +317,17 @@ async fn submit_task(
                                 office: None,
                             },
                         )?;
+                        if preserve_interruption(&store, &app, &mut task) {
+                            return Ok(());
+                        }
                         task.status = TaskStatus::Downloading;
                         save_task(&store, &app, &mut task);
                         finish_task(task, store, api, app).await
                     } else {
                         require_remote_id(&task)?;
+                        if preserve_interruption(&store, &app, &mut task) {
+                            return Ok(());
+                        }
                         task.status = TaskStatus::Waiting;
                         save_task(&store, &app, &mut task);
                         poll_task(task, store, credentials, api, app).await
@@ -344,12 +347,16 @@ async fn submit_task(
             };
             match response {
                 Ok((data, _)) => {
-                    if interrupted(&store, &task.id) {
-                        return Ok(());
-                    }
                     task.progress = 1.0;
                     task.remote_id = data.task_id.clone().or(task.remote_id);
                     task.remote_status = data.status.clone();
+                    if data.download_url.is_none() {
+                        require_remote_id(&task)?;
+                    }
+                    if data.download_url.is_none() && preserve_interruption(&store, &app, &mut task)
+                    {
+                        return Ok(());
+                    }
                     if data.status.as_deref().is_some_and(is_failed) {
                         fail_task(&store, &app, &mut task, office_error(&data));
                         return Ok(());
@@ -363,6 +370,9 @@ async fn submit_task(
                                 office: Some(data),
                             },
                         )?;
+                        if preserve_interruption(&store, &app, &mut task) {
+                            return Ok(());
+                        }
                         task.status = TaskStatus::Downloading;
                         save_task(&store, &app, &mut task);
                         finish_task(task, store, api, app).await
@@ -421,9 +431,15 @@ async fn poll_task(
                                 office: None,
                             },
                         )?;
+                        if preserve_interruption(&store, &app, &mut task) {
+                            return Ok(());
+                        }
                         task.status = TaskStatus::Downloading;
                         save_task(&store, &app, &mut task);
                         return finish_task(task, store, api, app).await;
+                    }
+                    if preserve_interruption(&store, &app, &mut task) {
+                        return Ok(());
                     }
                     if data.status.as_deref().is_some_and(is_failed) {
                         let error = data
@@ -460,9 +476,15 @@ async fn poll_task(
                                 office: Some(data),
                             },
                         )?;
+                        if preserve_interruption(&store, &app, &mut task) {
+                            return Ok(());
+                        }
                         task.status = TaskStatus::Downloading;
                         save_task(&store, &app, &mut task);
                         return finish_task(task, store, api, app).await;
+                    }
+                    if preserve_interruption(&store, &app, &mut task) {
+                        return Ok(());
                     }
                     if data.status.as_deref().is_some_and(is_failed) {
                         fail_task(&store, &app, &mut task, office_error(&data));
@@ -655,6 +677,18 @@ fn interrupted(store: &Store, id: &str) -> bool {
         .get_task(id)
         .map(|task| matches!(task.status, TaskStatus::Stopped | TaskStatus::Paused))
         .unwrap_or(true)
+}
+
+fn preserve_interruption(store: &Store, app: &AppHandle, task: &mut Task) -> bool {
+    let Ok(current) = store.get_task(&task.id) else {
+        return false;
+    };
+    if !matches!(current.status, TaskStatus::Stopped | TaskStatus::Paused) {
+        return false;
+    }
+    task.status = current.status;
+    save_task(store, app, task);
+    true
 }
 
 fn require_remote_id(task: &Task) -> Result<(), AppError> {
