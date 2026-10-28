@@ -140,7 +140,11 @@ impl ApiClient {
         progress: Option<ProgressCallback>,
     ) -> ApiResult<Form> {
         let mut form = Form::new().text("api_key", key.to_owned());
+        let has_zip = task.formats.iter().any(|format| format == "zip");
         for format in &task.formats {
+            if has_zip && matches!(format.as_str(), "md" | "markdown") {
+                continue;
+            }
             let format = if format == "md" { "markdown" } else { format };
             form = form.text("output_formats", format.to_owned());
         }

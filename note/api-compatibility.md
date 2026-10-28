@@ -35,6 +35,7 @@
 - `file` 与 `file_url` 严格互斥。
 - 多个 `output_formats` 作为重复 multipart 字段发送，值为 `markdown`、`json`、`zip`。
 - ZIP 与 `element_formats.image=file` 必须同时选择。
+- `.cn` 实际要求 ZIP 不能与 Markdown 同时请求（ZIP 只能单独使用或与 JSON 组合）。因此同时选择 Markdown/JSON/ZIP 时统一请求 `json + zip`，再从 ZIP 中恢复 Markdown，用户最终得到的输出格式不变。
 - `feature_config` 显式序列化为官方蛇形字段，如 `enable_text_cross_page`、`enable_title_level_recognition`，不直接发送前端使用的驼峰字段。
 - API 响应中的 `task_id`、`page_num`、`remaining_paid_pages` 等蛇形字段通过反序列化别名映射到前端驼峰模型。
 - 错误响应的 `data` 可能是空字符串而非对象，因此先解析 `code`/`message`，只有成功时才将 `data` 解码为具体响应模型。

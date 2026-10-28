@@ -28,7 +28,7 @@ pub fn output_directory(task: &Task) -> PathBuf {
 
 pub async fn persist_parse(
     task: &Task,
-    result: &ParseResult,
+    result: &mut ParseResult,
     api: &ApiClient,
     profile: &ServiceProfile,
     progress: ProgressCallback,
@@ -40,21 +40,6 @@ pub async fn persist_parse(
         .unwrap_or("document");
     let mut outputs = task.outputs.clone();
     let mut failure = None;
-
-    if task
-        .formats
-        .iter()
-        .any(|value| value == "md" || value == "markdown")
-        && !outputs.iter().any(|value| value.format == "md")
-    {
-        match result.outputs.markdown.as_ref() {
-            Some(markdown) => match save_bytes(&directory, stem, "md", markdown.as_bytes()) {
-                Ok(path) => outputs.push(output("md", path)),
-                Err(error) => failure = Some(error),
-            },
-            None => failure = Some(AppError::new("result", "Markdown output is missing")),
-        }
-    }
 
     if task.formats.iter().any(|value| value == "json")
         && !outputs.iter().any(|value| value.format == "json")
@@ -91,6 +76,34 @@ pub async fn persist_parse(
     if let Some(zip) = outputs.iter().find(|value| value.format == "zip") {
         if let Err(error) = extract_zip_resources(Path::new(&zip.path), &directory.join("assets")) {
             failure = Some(error);
+        }
+    }
+
+    let wants_markdown = task
+        .formats
+        .iter()
+        .any(|value| value == "md" || value == "markdown");
+    if wants_markdown
+        && result.outputs.markdown.is_none()
+        && outputs.iter().any(|value| value.format == "zip")
+    {
+        match markdown_from_zip(&directory.join("assets")) {
+            Ok(markdown) => result.outputs.markdown = Some(markdown),
+            Err(error) if failure.is_none() => failure = Some(error),
+            _ => {}
+        }
+    }
+
+    if wants_markdown && !outputs.iter().any(|value| value.format == "md") {
+        match result.outputs.markdown.as_ref() {
+            Some(markdown) => match save_bytes(&directory, stem, "md", markdown.as_bytes()) {
+                Ok(path) => outputs.push(output("md", path)),
+                Err(error) => failure = Some(error),
+            },
+            None if failure.is_none() => {
+                failure = Some(AppError::new("result", "Markdown output is missing"))
+            }
+            _ => {}
         }
     }
 
@@ -290,6 +303,53 @@ fn markdown_to_text(markdown: &str) -> String {
         }
     }
     output
+}
+
+fn markdown_from_zip(root: &Path) -> Result<String, AppError> {
+    let mut files = Vec::new();
+    collect_markdown_files(root, &mut files, 0)?;
+    files.sort();
+    let path = files
+        .iter()
+        .find(|path| {
+            path.file_name()
+                .and_then(|value| value.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("main.md"))
+        })
+        .or_else(|| files.first())
+        .ok_or_else(|| AppError::new("result", "The ZIP does not contain Markdown output"))?;
+    std::fs::read_to_string(path)
+        .map_err(|_| AppError::new("result", "Unable to read Markdown from the ZIP"))
+}
+
+fn collect_markdown_files(
+    root: &Path,
+    files: &mut Vec<PathBuf>,
+    depth: usize,
+) -> Result<(), AppError> {
+    if depth > 12 || !root.exists() {
+        return Ok(());
+    }
+    let entries = std::fs::read_dir(root)
+        .map_err(|_| AppError::new("resources", "Unable to inspect extracted resources"))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_markdown_files(&path, files, depth + 1)?;
+        } else if path
+            .extension()
+            .and_then(|value| value.to_str())
+            .is_some_and(|extension| {
+                matches!(
+                    extension.to_ascii_lowercase().as_str(),
+                    "md" | "markdown" | "smd"
+                )
+            })
+        {
+            files.push(path);
+        }
+    }
+    Ok(())
 }
 
 fn extract_zip_resources(zip_path: &Path, destination: &Path) -> Result<(), AppError> {

@@ -517,7 +517,7 @@ async fn finish_task(
         .result_path
         .clone()
         .ok_or_else(|| AppError::new("result", "The stored result is unavailable"))?;
-    let result = store
+    let mut result = store
         .load_result(&result_path)
         .map_err(|_| AppError::new("result", "The stored result cannot be read"))?;
     loop {
@@ -529,7 +529,7 @@ async fn finish_task(
         let progress = progress_callback(task.id.clone(), app.clone());
         let (outputs, failure) = match (
             task.kind.clone(),
-            result.parse.as_ref(),
+            result.parse.as_mut(),
             result.office.as_ref(),
         ) {
             (TaskKind::Parse, Some(parse), _) => {
@@ -546,6 +546,7 @@ async fn finish_task(
             }
         };
         task.outputs = outputs;
+        store_result(&store, &mut task, result.clone())?;
         match failure {
             None => {
                 task.status = TaskStatus::Success;
