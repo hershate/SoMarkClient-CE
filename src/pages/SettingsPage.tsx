@@ -1,8 +1,9 @@
-import { open } from '@tauri-apps/plugin-dialog'
-import { FolderOpen, Save, ShieldCheck } from 'lucide-react'
+import { open, save as saveDialog } from '@tauri-apps/plugin-dialog'
+import { Download, FolderOpen, Save, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { PageHeader, Toggle } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { backend } from '../lib/tauri'
 import type { AppSettings } from '../types'
 
 export default function SettingsPage() {
@@ -58,6 +59,16 @@ export default function SettingsPage() {
           <div className="settings-row"><label>{t('settings.quota')}</label><input type="number" min={0} value={draft.quotaWarningPages} onChange={(event) => update('quotaWarningPages', Number(event.target.value))} /></div>
           <Toggle checked={draft.blockOnLowQuota} onChange={(value) => update('blockOnLowQuota', value)} label={t('settings.blockQuota')} />
           <div className="privacy-panel"><ShieldCheck size={20} /><p>{t('settings.telemetry')}</p></div>
+          <button type="button" className="button diagnostics-button" onClick={async () => {
+            const destination = await saveDialog({ defaultPath: `SoMarkClient-CE-${version}-diagnostics.zip` })
+            if (!destination) return
+            try {
+              const path = await backend.exportDiagnostics(destination)
+              notify(path, 'success')
+            } catch (error) {
+              notify(String(error), 'error')
+            }
+          }}><Download size={15} />Export diagnostics</button>
         </section>
       </div>
       <footer className="about-footer"><div className="brand-symbol small"><span>S</span><i /></div><div><strong>SoMarkClient CE</strong><p>v{version} · Apache-2.0 · Independent SoMark client</p></div></footer>

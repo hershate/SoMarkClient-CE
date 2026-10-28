@@ -33,6 +33,8 @@ export const backend = {
     invoke<OutputFile>('export_task_result', { id, format }),
   clearHistory: (olderThanDays?: number) =>
     invoke<number>('clear_history', { olderThanDays }),
+  exportDiagnostics: (destination: string) =>
+    invoke<string>('export_diagnostics', { destination }),
   preflightFiles: (paths: string[], recursive: boolean, serviceId: string) =>
     invoke<PreflightResult[]>('preflight_files', { paths, recursive, serviceId }),
   importClipboardImage: (serviceId: string) =>

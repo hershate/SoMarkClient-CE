@@ -610,6 +610,23 @@ fn save_task(store: &Store, app: &AppHandle, task: &mut Task) {
         return;
     }
     let _ = app.emit("task-updated", &*task);
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let active = store
+            .list_tasks()
+            .map(|tasks| {
+                tasks
+                    .iter()
+                    .filter(|item| {
+                        matches!(
+                            item.status,
+                            TaskStatus::Uploading | TaskStatus::Waiting | TaskStatus::Downloading
+                        )
+                    })
+                    .count()
+            })
+            .unwrap_or(0);
+        let _ = tray.set_tooltip(Some(format!("SoMarkClient CE · {active} active")));
+    }
 }
 
 fn notify_completion(store: &Store, app: &AppHandle, task: &Task) {

@@ -1,7 +1,9 @@
 mod api;
 mod assets;
 mod credentials;
+mod desktop;
 mod input;
+mod logging;
 mod models;
 mod queue;
 mod results;
@@ -14,6 +16,7 @@ use models::{
 };
 use queue::QueueManager;
 use serde::Serialize;
+use std::path::PathBuf;
 use store::Store;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
@@ -24,6 +27,8 @@ pub struct AppState {
     pub api: ApiClient,
     pub queue: QueueManager,
     pub portable: bool,
+    pub data_dir: PathBuf,
+    _log_guard: tracing_appender::non_blocking::WorkerGuard,
 }
 
 impl AppState {
@@ -43,9 +48,13 @@ impl AppState {
                 .app_data_dir()
                 .map_err(|error| error.to_string())?
         };
+        let log_guard = logging::initialize(&data_dir)?;
         let output_root = data_dir.join("outputs");
-        let store = Store::new(data_dir, output_root.to_string_lossy().into_owned())
+        let store = Store::new(data_dir.clone(), output_root.to_string_lossy().into_owned())
             .map_err(|error| error.to_string())?;
+        if let Ok(settings) = store.settings() {
+            let _ = store.clear_history(Some(settings.history_days));
+        }
         let credentials = CredentialStore::new(portable);
         let api = ApiClient::new();
         let queue = QueueManager::new(store.clone(), credentials.clone(), api.clone(), app.clone());
@@ -55,6 +64,8 @@ impl AppState {
             api,
             queue,
             portable,
+            data_dir,
+            _log_guard: log_guard,
         })
     }
 }
@@ -326,6 +337,23 @@ fn clear_history(
 }
 
 #[tauri::command]
+fn export_diagnostics(destination: String, state: State<'_, AppState>) -> Result<PathBuf, String> {
+    logging::export_diagnostics(
+        &state.data_dir,
+        &destination,
+        &state.store.settings().map_err(|error| error.to_string())?,
+        &state
+            .store
+            .list_services()
+            .map_err(|error| error.to_string())?,
+        &state
+            .store
+            .list_tasks()
+            .map_err(|error| error.to_string())?,
+    )
+}
+
+#[tauri::command]
 fn preflight_files(
     paths: Vec<String>,
     recursive: bool,
@@ -439,6 +467,8 @@ pub fn run() {
         .setup(|app| {
             let state = AppState::new(&app.handle())?;
             app.manage(state);
+            desktop::configure(&app.handle())?;
+            tracing::info!("SoMarkClient CE initialized");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -458,6 +488,7 @@ pub fn run() {
             save_markdown_copy,
             export_task_result,
             clear_history,
+            export_diagnostics,
             preflight_files,
             import_clipboard_image,
             supported_extensions,
