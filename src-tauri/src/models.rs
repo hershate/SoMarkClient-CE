@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::path::Path;
 use uuid::Uuid;
 
-pub const DEFAULT_BASE_URL: &str = "https://somark.ai/api/v1";
+pub const DEFAULT_BASE_URL: &str = "https://somark.cn/api/v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

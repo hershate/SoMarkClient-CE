@@ -56,7 +56,7 @@ export default function ServicesPage() {
           setEditing({
             id: crypto.randomUUID(),
             name: 'SoMark',
-            baseUrl: 'https://somark.ai/api/v1',
+            baseUrl: 'https://somark.cn/api/v1',
             proxyMode: 'system',
             proxyUrl: null,
             timeoutSecs: 120,
