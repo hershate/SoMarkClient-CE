@@ -37,6 +37,7 @@
 - ZIP 与 `element_formats.image=file` 必须同时选择。
 - `feature_config` 显式序列化为官方蛇形字段，如 `enable_text_cross_page`、`enable_title_level_recognition`，不直接发送前端使用的驼峰字段。
 - API 响应中的 `task_id`、`page_num`、`remaining_paid_pages` 等蛇形字段通过反序列化别名映射到前端驼峰模型。
+- 错误响应的 `data` 可能是空字符串而非对象，因此先解析 `code`/`message`，只有成功时才将 `data` 解码为具体响应模型。
 
 ## 限制与状态
 
