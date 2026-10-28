@@ -14,9 +14,34 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "stream", "rustls-tls"] }
+futures-util = "0.3"
+bytes = "1"
+async-stream = "0.3"
+rusqlite = { version = "0.32", features = ["bundled"] }
+keyring = { version = "3", features = ["windows-native"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.12"
+tracing = "0.1"
+tracing-appender = "0.2"
+url = "2"
+sanitize-filename = "0.6"
+lopdf = "0.35"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+arboard = "3"
+base64 = "0.22"
+png = "0.18"
 
 [profile.release]
 codegen-units = 1
