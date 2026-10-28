@@ -160,7 +160,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const saveService = useCallback(async (profile: ServiceProfile, apiKey?: string) => {
     await backend.saveService(profile, apiKey)
-    setServices(await backend.bootstrap().then((value) => value.services))
+    const bootstrap = await backend.bootstrap()
+    setServices(bootstrap.services)
+    setSettings(bootstrap.settings)
   }, [])
 
   const deleteService = useCallback(async (id: string) => {

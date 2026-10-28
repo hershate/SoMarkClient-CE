@@ -353,15 +353,27 @@ impl ServiceProfile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Usage {
-    #[serde(alias = "remaining_paid_pages")]
+    #[serde(
+        alias = "remaining_paid_pages",
+        default,
+        deserialize_with = "null_default"
+    )]
     pub remaining_paid_pages: i64,
-    #[serde(alias = "remaining_free_pages_today")]
+    #[serde(
+        alias = "remaining_free_pages_today",
+        default,
+        deserialize_with = "null_default"
+    )]
     pub remaining_free_pages_today: i64,
-    #[serde(alias = "remaining_free_pages_this_month")]
+    #[serde(
+        alias = "remaining_free_pages_this_month",
+        default,
+        deserialize_with = "null_default"
+    )]
     pub remaining_free_pages_this_month: i64,
-    #[serde(alias = "dashboard_url")]
+    #[serde(alias = "dashboard_url", default, deserialize_with = "null_default")]
     pub dashboard_url: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_default")]
     pub warnings: Vec<String>,
 }
 
@@ -427,6 +439,7 @@ pub struct ParseResult {
     #[serde(alias = "file_name")]
     pub file_name: Option<String>,
     pub catalog: Option<Value>,
+    #[serde(default, deserialize_with = "null_default")]
     pub outputs: ParseOutputs,
 }
 
@@ -475,10 +488,21 @@ pub struct OfficeData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiEnvelope<T> {
     pub code: i32,
+    #[serde(default, deserialize_with = "null_default")]
     pub message: String,
-    pub data: Option<T>,
     #[serde(default)]
+    pub msg: Option<String>,
+    pub data: Option<T>,
+    #[serde(default, deserialize_with = "null_default")]
     pub warnings: Vec<String>,
+}
+
+fn null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

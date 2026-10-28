@@ -51,7 +51,7 @@ pnpm tauri build
 Release 构建成功后执行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/package-portable.ps1 -Version 0.1.0
+powershell -ExecutionPolicy Bypass -File scripts/package-portable.ps1 -Version 0.1.1
 ```
 
-脚本将安装包与 `release/SoMarkClient-CE-0.1.0-portable.zip` 收集到 `release/`。便携版通过 EXE 同目录的 `portable.flag` 识别，数据写入便携目录，API Key 仅保留在内存中。
+脚本将安装包与 `release/SoMarkClient-CE-0.1.1-portable.zip` 收集到 `release/`。便携版通过 EXE 同目录的 `portable.flag` 识别，数据写入便携目录，API Key 仅保留在内存中。

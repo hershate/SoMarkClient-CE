@@ -69,15 +69,21 @@ impl ApiClient {
             .bytes()
             .await
             .map_err(|error| map_request_error(&error))?;
-        let envelope: ApiEnvelope<serde_json::Value> = serde_json::from_slice(&bytes).map_err(|_| {
-            if status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS {
-                AppError::network(format!("The service returned HTTP {status}"))
-            } else {
-                AppError::new("response", format!("Invalid API response (HTTP {status})"))
-            }
-        })?;
+        let envelope: ApiEnvelope<serde_json::Value> =
+            serde_json::from_slice(&bytes).map_err(|_| {
+                if status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS {
+                    AppError::network(format!("The service returned HTTP {status}"))
+                } else {
+                    AppError::new("response", format!("Invalid API response (HTTP {status})"))
+                }
+            })?;
         if envelope.code != 0 {
-            return Err(AppError::api(envelope.code, envelope.message));
+            let message = if envelope.message.is_empty() {
+                envelope.msg.unwrap_or_default()
+            } else {
+                envelope.message
+            };
+            return Err(AppError::api(envelope.code, message));
         }
         if !status.is_success() {
             return Err(AppError::new(
@@ -88,8 +94,16 @@ impl ApiClient {
         let data = envelope
             .data
             .ok_or_else(|| AppError::new("response", "The API response did not contain data"))?;
-        let data = serde_json::from_value(data)
-            .map_err(|_| AppError::new("response", "The API response data has an unexpected shape"))?;
+        let shape = response_shape(&data);
+        let data = serde_json::from_value(data).map_err(|_| {
+            AppError::new(
+                "response",
+                format!(
+                    "The API response data has an unexpected shape for {} ({shape})",
+                    std::any::type_name::<T>()
+                ),
+            )
+        })?;
         Ok((data, envelope.warnings))
     }
 
@@ -299,6 +313,48 @@ impl ApiClient {
             .await
             .map_err(|_| AppError::new("download", "Unable to finalize the output file"))?;
         Ok(destination.to_path_buf())
+    }
+}
+
+fn response_shape(data: &serde_json::Value) -> String {
+    let mut shape = format!("data type={}", json_kind(data));
+    if let Some(object) = data.as_object() {
+        shape.push_str(&format!(
+            ", data keys=[{}]",
+            object
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+    }
+    if let Some(result) = data.get("result") {
+        shape.push_str(&format!(", result type={}", json_kind(result)));
+        if let Some(outputs) = result.get("outputs") {
+            shape.push_str(&format!(", outputs type={}", json_kind(outputs)));
+            if let Some(object) = outputs.as_object() {
+                shape.push_str(&format!(
+                    ", output keys=[{}]",
+                    object
+                        .keys()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ));
+            }
+        }
+    }
+    shape
+}
+
+fn json_kind(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
     }
 }
 

@@ -111,17 +111,24 @@ fn save_service(
     validate_base_url(&profile.base_url)?;
     profile.base_url = profile.base_url.trim_end_matches('/').to_string();
     if let Some(key) = api_key.filter(|value| !value.trim().is_empty()) {
+        let key = credentials::normalize_api_key(&key);
         if !key.starts_with("sk-") {
             return Err("API Key must use the sk- format".into());
         }
         state
             .credentials
-            .set(&profile.id, key.trim())
+            .set(&profile.id, &key)
             .map_err(|error| error.to_string())?;
     }
     state
         .store
         .save_service(&profile)
+        .map_err(|error| error.to_string())?;
+    let mut settings = state.store.settings().map_err(|error| error.to_string())?;
+    settings.active_service_id = Some(profile.id);
+    state
+        .store
+        .save_settings(&settings)
         .map_err(|error| error.to_string())
 }
 
