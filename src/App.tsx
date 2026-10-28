@@ -1,13 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { Loading } from './components/ui'
 import { AppProvider, useApp } from './context/AppContext'
 import HistoryPage from './pages/HistoryPage'
 import NewTaskPage from './pages/NewTaskPage'
-import ResultPage from './pages/ResultPage'
 import ServicesPage from './pages/ServicesPage'
 import SettingsPage from './pages/SettingsPage'
 import TasksPage from './pages/TasksPage'
+
+const ResultPage = lazy(() => import('./pages/ResultPage'))
 
 export default function App() {
   return (
@@ -31,7 +33,7 @@ function AppRoutes() {
         <Route path="history" element={<HistoryPage />} />
         <Route path="services" element={<ServicesPage />} />
         <Route path="settings" element={<SettingsPage />} />
-        <Route path="result/:taskId" element={<ResultPage />} />
+        <Route path="result/:taskId" element={<Suspense fallback={<Loading />}><ResultPage /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

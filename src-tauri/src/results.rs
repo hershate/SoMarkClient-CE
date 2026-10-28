@@ -80,7 +80,13 @@ pub async fn persist_parse(
             Some(url) => {
                 let destination = unique_path(directory.join(format!("{stem}.zip")), false);
                 match api.download(profile, url, &destination, progress).await {
-                    Ok(path) => outputs.push(output("zip", path)),
+                    Ok(path) => {
+                        if let Err(error) = extract_zip_resources(&path, &directory.join("assets"))
+                        {
+                            failure = Some(error);
+                        }
+                        outputs.push(output("zip", path));
+                    }
                     Err(error) => failure = Some(error),
                 }
             }
@@ -171,4 +177,162 @@ fn output(format: impl Into<String>, path: PathBuf) -> OutputFile {
         format: format.into(),
         path: path.to_string_lossy().into_owned(),
     }
+}
+
+pub fn save_markdown_copy(
+    task: &Task,
+    content: &str,
+    destination: Option<String>,
+) -> Result<OutputFile, AppError> {
+    let directory = output_directory(task);
+    let stem = directory
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("document");
+    let path = destination
+        .map(PathBuf::from)
+        .unwrap_or_else(|| directory.join(format!("{stem}.edited.md")));
+    let path = unique_path(path, false);
+    atomic_write(&path, content.as_bytes())
+        .map_err(|_| AppError::new("output", "Unable to save the Markdown copy"))?;
+    Ok(output("md", path))
+}
+
+pub fn export_parse(
+    task: &Task,
+    result: &ParseResult,
+    format: &str,
+) -> Result<OutputFile, AppError> {
+    let directory = output_directory(task);
+    let stem = directory
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("document");
+    match format {
+        "html" => {
+            let markdown = result.outputs.markdown.as_deref().ok_or_else(|| {
+                AppError::new("export", "Markdown output is required for HTML export")
+            })?;
+            let mut options = pulldown_cmark::Options::empty();
+            options.insert(pulldown_cmark::Options::ENABLE_TABLES);
+            options.insert(pulldown_cmark::Options::ENABLE_STRIKETHROUGH);
+            options.insert(pulldown_cmark::Options::ENABLE_TASKLISTS);
+            options.insert(pulldown_cmark::Options::ENABLE_FOOTNOTES);
+            let parser = pulldown_cmark::Parser::new_ext(markdown, options);
+            let mut body = String::new();
+            pulldown_cmark::html::push_html(&mut body, parser);
+            let body = ammonia::clean(&body);
+            let document = format!(
+                "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>{}</title><style>body{{max-width:960px;margin:40px auto;padding:0 24px;font:16px/1.75 system-ui,sans-serif;color:#17201d}}img{{max-width:100%}}table{{width:100%;border-collapse:collapse}}th,td{{padding:8px;border:1px solid #ddd}}pre{{overflow:auto;padding:16px;background:#f5f6f3}}</style></head><body>{}</body></html>",
+                sanitize_filename::sanitize(stem),
+                body
+            );
+            let path = save_bytes(&directory, stem, "html", document.as_bytes())?;
+            Ok(output("html", path))
+        }
+        "txt" => {
+            let text = result
+                .outputs
+                .json_output
+                .as_ref()
+                .map(json_to_text)
+                .filter(|value| !value.trim().is_empty())
+                .or_else(|| {
+                    result
+                        .outputs
+                        .markdown
+                        .as_ref()
+                        .map(|value| markdown_to_text(value))
+                })
+                .ok_or_else(|| AppError::new("export", "No text output is available"))?;
+            let path = save_bytes(&directory, stem, "txt", text.as_bytes())?;
+            Ok(output("txt", path))
+        }
+        _ => Err(AppError::new("export", "Unsupported export format")),
+    }
+}
+
+fn json_to_text(value: &serde_json::Value) -> String {
+    let mut output = String::new();
+    if let Some(pages) = value.get("pages").and_then(|value| value.as_array()) {
+        for page in pages {
+            if let Some(blocks) = page.get("blocks").and_then(|value| value.as_array()) {
+                for block in blocks {
+                    if let Some(content) = block.get("content").and_then(|value| value.as_str()) {
+                        if !output.is_empty() {
+                            output.push_str("\n\n");
+                        }
+                        output.push_str(content);
+                    }
+                }
+            }
+        }
+    }
+    output
+}
+
+fn markdown_to_text(markdown: &str) -> String {
+    let mut output = String::new();
+    for event in pulldown_cmark::Parser::new(markdown) {
+        match event {
+            pulldown_cmark::Event::Text(text) | pulldown_cmark::Event::Code(text) => {
+                output.push_str(&text)
+            }
+            pulldown_cmark::Event::SoftBreak | pulldown_cmark::Event::HardBreak => {
+                output.push('\n')
+            }
+            pulldown_cmark::Event::End(
+                pulldown_cmark::TagEnd::Paragraph
+                | pulldown_cmark::TagEnd::Heading(_)
+                | pulldown_cmark::TagEnd::Item,
+            ) => output.push_str("\n\n"),
+            _ => {}
+        }
+    }
+    output
+}
+
+fn extract_zip_resources(zip_path: &Path, destination: &Path) -> Result<(), AppError> {
+    let file = std::fs::File::open(zip_path)
+        .map_err(|_| AppError::new("resources", "Unable to open the downloaded ZIP"))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|_| AppError::new("resources", "The downloaded ZIP is invalid"))?;
+    if archive.len() > 10_000 {
+        return Err(AppError::new(
+            "resources",
+            "The ZIP contains too many entries",
+        ));
+    }
+    let mut total_size = 0_u64;
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|_| AppError::new("resources", "Unable to read a ZIP entry"))?;
+        total_size = total_size.saturating_add(entry.size());
+        if total_size > 2 * 1024 * 1024 * 1024 {
+            return Err(AppError::new(
+                "resources",
+                "The ZIP expands beyond the safety limit",
+            ));
+        }
+        let relative = entry
+            .enclosed_name()
+            .ok_or_else(|| AppError::new("resources", "The ZIP contains an unsafe path"))?
+            .to_path_buf();
+        let path = destination.join(relative);
+        if entry.is_dir() {
+            std::fs::create_dir_all(&path)
+                .map_err(|_| AppError::new("resources", "Unable to create a resource directory"))?;
+            continue;
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|_| AppError::new("resources", "Unable to create a resource directory"))?;
+        }
+        let mut output = std::fs::File::create(&path)
+            .map_err(|_| AppError::new("resources", "Unable to write an extracted resource"))?;
+        std::io::copy(&mut entry, &mut output)
+            .map_err(|_| AppError::new("resources", "Unable to extract a ZIP resource"))?;
+    }
+    Ok(())
 }

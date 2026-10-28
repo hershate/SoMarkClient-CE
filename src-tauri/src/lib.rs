@@ -1,4 +1,5 @@
 mod api;
+mod assets;
 mod credentials;
 mod input;
 mod models;
@@ -236,6 +237,84 @@ fn load_task_result(id: String, state: State<'_, AppState>) -> Result<StoredResu
 }
 
 #[tauri::command]
+fn prepare_task_assets(
+    id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let task = state
+        .store
+        .get_task(&id)
+        .map_err(|error| error.to_string())?;
+    assets::prepare(&app, &task)
+}
+
+#[tauri::command]
+fn resolve_result_asset(
+    id: String,
+    source: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let task = state
+        .store
+        .get_task(&id)
+        .map_err(|error| error.to_string())?;
+    assets::resolve(&app, &task, &source)
+}
+
+#[tauri::command]
+fn save_markdown_copy(
+    id: String,
+    content: String,
+    destination: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<models::OutputFile, String> {
+    let mut task = state
+        .store
+        .get_task(&id)
+        .map_err(|error| error.to_string())?;
+    let output =
+        results::save_markdown_copy(&task, &content, destination).map_err(|error| error.message)?;
+    task.outputs.push(output.clone());
+    state
+        .store
+        .save_task(&task)
+        .map_err(|error| error.to_string())?;
+    Ok(output)
+}
+
+#[tauri::command]
+fn export_task_result(
+    id: String,
+    format: String,
+    state: State<'_, AppState>,
+) -> Result<models::OutputFile, String> {
+    let mut task = state
+        .store
+        .get_task(&id)
+        .map_err(|error| error.to_string())?;
+    let result_path = task
+        .result_path
+        .clone()
+        .ok_or_else(|| "The task has no stored result".to_string())?;
+    let stored = state
+        .store
+        .load_result(&result_path)
+        .map_err(|error| error.to_string())?;
+    let parse = stored
+        .parse
+        .ok_or_else(|| "Only parse results can be exported as HTML or text".to_string())?;
+    let output = results::export_parse(&task, &parse, &format).map_err(|error| error.message)?;
+    task.outputs.push(output.clone());
+    state
+        .store
+        .save_task(&task)
+        .map_err(|error| error.to_string())?;
+    Ok(output)
+}
+
+#[tauri::command]
 fn clear_history(
     older_than_days: Option<u32>,
     state: State<'_, AppState>,
@@ -316,6 +395,20 @@ fn validate_new_task(task: &NewTask) -> Result<(), String> {
             }
         }
         TaskKind::Office => {
+            let is_pdf = match &task.source {
+                TaskSource::Local { path } | TaskSource::Clipboard { path } => {
+                    std::path::Path::new(path)
+                        .extension()
+                        .and_then(|value| value.to_str())
+                        .is_some_and(|value| value.eq_ignore_ascii_case("pdf"))
+                }
+                TaskSource::Url { url } => url::Url::parse(url)
+                    .map(|value| value.path().to_lowercase().ends_with(".pdf"))
+                    .unwrap_or(false),
+            };
+            if !is_pdf {
+                return Err("Office conversion only supports PDF files".into());
+            }
             if task.office_options.target_type == "ppt"
                 && task.office_options.layout_mode != "layout"
             {
@@ -360,6 +453,10 @@ pub fn run() {
             queue_action,
             pause_queue,
             load_task_result,
+            prepare_task_assets,
+            resolve_result_asset,
+            save_markdown_copy,
+            export_task_result,
             clear_history,
             preflight_files,
             import_clipboard_image,

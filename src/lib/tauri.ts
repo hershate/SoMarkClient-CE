@@ -3,6 +3,7 @@ import type {
   AppSettings,
   Bootstrap,
   NewTask,
+  OutputFile,
   PreflightResult,
   ServiceProfile,
   StoredResult,
@@ -23,6 +24,13 @@ export const backend = {
     invoke<void>('queue_action', { id, action, confirmed, priority }),
   pauseQueue: (paused: boolean) => invoke<void>('pause_queue', { paused }),
   loadTaskResult: (id: string) => invoke<StoredResult>('load_task_result', { id }),
+  prepareTaskAssets: (id: string) => invoke<void>('prepare_task_assets', { id }),
+  resolveResultAsset: (id: string, source: string) =>
+    invoke<string>('resolve_result_asset', { id, source }),
+  saveMarkdownCopy: (id: string, content: string, destination?: string) =>
+    invoke<OutputFile>('save_markdown_copy', { id, content, destination }),
+  exportTaskResult: (id: string, format: 'html' | 'txt') =>
+    invoke<OutputFile>('export_task_result', { id, format }),
   clearHistory: (olderThanDays?: number) =>
     invoke<number>('clear_history', { olderThanDays }),
   preflightFiles: (paths: string[], recursive: boolean, serviceId: string) =>
