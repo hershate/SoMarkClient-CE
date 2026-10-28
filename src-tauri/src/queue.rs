@@ -418,7 +418,7 @@ async fn poll_task(
                 Ok((data, warnings)) => {
                     task.warnings = warnings;
                     task.remote_status = data.status.clone();
-                    if data.status.as_deref() == Some("success") {
+                    if data.status.as_deref().is_some_and(is_success) {
                         let result = data.result.ok_or_else(|| {
                             AppError::new("response", "The completed task did not contain a result")
                         })?;
@@ -467,7 +467,7 @@ async fn poll_task(
             TaskKind::Office => match api.office_check(&profile, &key, &remote_id).await {
                 Ok((data, _)) => {
                     task.remote_status = data.status.clone();
-                    if data.status.as_deref() == Some("SUCCESS") {
+                    if data.status.as_deref().is_some_and(is_success) {
                         store_result(
                             &store,
                             &mut task,
@@ -718,6 +718,10 @@ fn office_error(data: &OfficeData) -> AppError {
 
 fn is_failed(status: &str) -> bool {
     status.eq_ignore_ascii_case("failed")
+}
+
+fn is_success(status: &str) -> bool {
+    status.eq_ignore_ascii_case("success")
 }
 
 fn batch_size(store: &Store, batch_id: &str) -> usize {

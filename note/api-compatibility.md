@@ -44,7 +44,7 @@
 
 正式服务默认按单文件 200MB、最多 300 页、QPS 4 处理。服务配置可调整限制以适配私有化或兼容中转，但不会因此改变官方服务端限制。
 
-解析轮询状态为 `queuing`、`processing`、`success`、`failed`。Office 状态为 `PARSING`、`QUEUING`、`CONVERTING`、`SUCCESS`、`FAILED`。默认每 4 秒轮询一次。
+解析轮询状态为 `queuing`、`processing`、`success`、`failed`。Office 状态为 `PARSING`、`QUEUING`、`CONVERTING`、`SUCCESS`、`FAILED`。默认每 4 秒轮询一次。实际服务可能返回大写 `SUCCESS`，客户端按大小写不敏感识别成功状态并进入下载。
 
 接口不提供真实解析百分比。界面只展示上传比例、真实云端阶段和耗时，不显示伪造的云端进度。
 
