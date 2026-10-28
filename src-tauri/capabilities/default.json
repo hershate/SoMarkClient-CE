@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "Core permissions for the main SoMarkClient CE window",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "notification:default",
+    "opener:default",
+    "process:default"
+  ]
 }
